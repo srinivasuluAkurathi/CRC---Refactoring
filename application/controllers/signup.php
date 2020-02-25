@@ -21,14 +21,13 @@ class Signup extends CI_Controller {
 
 	}
 
-	public function thirtyDayFreeTrialSignupWebhook(){
+	public function thirtyDayFreeTrialSignupClickFunnelWebhook(){
 			
             $requestJSONfromClickFunnel  = json_decode(file_get_contents("php://input"));
             if(AWS_ENV_STATUS == 'LIVE' )
             $requestArrayFromClickfunnel = $this->mymodel->setWebhookRequestParams($requestJSONfromClickFunnel->purchase,'cr_start');
             else
-            $requestArrayFromClickfunnel = $this->mymodel->setWebhookRequestParams($requestJSONfromClickFunnel,'cr_start_master');
-            
+            $requestArrayFromClickfunnel = $this->mymodel->setWebhookRequestParams($requestJSONfromClickFunnel,'cr_start_master');            
 
 	}
 	private function setWebhookRequestParams($requestJSONfromClickFunnel, $planCode){
