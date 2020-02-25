@@ -6,30 +6,58 @@ class Signup extends CI_Controller {
 
  	function __construct(){
 		parent::__construct();
-		$this->load->model('signup_model','mymodel'); // Wrong
-		$this->load->model('common_repository','common_model'); // Wrong
-	}
-
-	public function index(){
-			
-            $webhook_response = json_decode(file_get_contents("php://input"));
-            if(AWS_ENV_STATUS == 'LIVE' ){
-            $response=$this->setWebhookResponseParams($webhook_response->purchase,'cr_start');
-            }else{
-            $response=$this->setWebhookResponseParams($webhook_response,'cr_start_master');
-            }
-
+		$this->load->model('Signupmodel','myModel');  
+		$this->load->model('Commonrepository','commonModel');
+		$this->load->library('RecurlyAuthentication'); 
 	}
 
 	public function thirtyDayFreeTrialSignupClickFunnelWebhook(){
-			
-            $requestJSONfromClickFunnel  = json_decode(file_get_contents("php://input"));
+			$requestJSONfromClickFunnel  = json_decode(file_get_contents("php://input"));
             if(AWS_ENV_STATUS == 'LIVE' )
-            $requestArrayFromClickfunnel = $this->mymodel->setWebhookRequestParams($requestJSONfromClickFunnel->purchase,'cr_start');
+            $requestArrayFromClickfunnel = $this->setWebhookRequestParams($requestJSONfromClickFunnel->purchase,'cr_start');
             else
-            $requestArrayFromClickfunnel = $this->mymodel->setWebhookRequestParams($requestJSONfromClickFunnel,'cr_start_master');            
+            $requestArrayFromClickfunnel = $this->setWebhookRequestParams($requestJSONfromClickFunnel,'cr_start_master');
+        	$validRecurlyAccountArray	 = $this->checkIsRecurlyValidAccount($requestArrayFromClickfunnel,$requestJSONfromClickFunnel);
+        	$recurlyAccountCode 		 = $validRecurlyAccountArray['recurlyAccountCode'];
+        	$subscriptionid 		 	 = $validRecurlyAccountArray['subscriptionid'];
+                       
 
 	}
+
+
+
+
+
+	private function checkIsRecurlyValidAccount($requestArrayFromClickfunnel,$requestJSONfromClickFunnel){
+		$validRecurlyAccountArray							= array();
+		$isRecurlyValidAccount								= 0;
+		$validRecurlyAccountArray['subscriptionid']			= $requestArrayFromClickfunnel['subid'];
+		$validRecurlyAccountArray['recurlyAccountCode']		= $requestArrayFromClickfunnel['recurlyAc_code'];
+		try {
+		$subscriptions =$this->RecurlyAuthentication->getRecurlySubscriptionbyAccountCode($validRecurlyAccountArray['recurlyAccountCode']);
+		foreach ($subscriptions as $subscription) {
+			if ($subscription->state == 'active' && $subscription->plan->plan_code == $plan_code) {
+			$isRecurlyValidAccount							= 1;
+			$validRecurlyAccountArray['subscriptionid'] 	= $subscription->uuid;
+			}
+		  }
+		} catch (Recurly_NotFoundError $e) {
+
+		}
+
+		if($isRecurlyValidAccount == 0 && !empty($validRecurlyAccountArray['subscriptionid'])){
+		try {    
+		$subscription = $this->RecurlyAuthentication->getRecurlySubscriptionbySubscriptionid($validRecurlyAccountArray['subscriptionid']);
+		$validRecurlyAccountArray['recurlyAccountCode']		= explode("accounts/",array_values((array) $subscription->account)[1])[1];
+		}catch (Recurly_NotFoundError $e) {
+		@mail("debuglog@creditrepaircloud.com", "CF - RECURLY ACCOUNT SUBSCRIPTION NOT FOUND", print_r($requestJSONfromClickFunnel,1));
+			exit;
+			}
+		}
+        return $validRecurlyAccountArray;
+	}
+
+
 	private function setWebhookRequestParams($requestJSONfromClickFunnel, $planCode){
 		 $requestArrayFromClickfunnel    = array(
         'txtFirstName'    => trim(addslashes(ucfirst(strtolower($requestJSONfromClickFunnel->contact->first_name))));

@@ -1,5 +1,5 @@
 <?php
-class common_repository extends CI_Model{
+class Commonrepository extends CI_Model{
 
 	public function  __construct(){
 		parent::__construct();
