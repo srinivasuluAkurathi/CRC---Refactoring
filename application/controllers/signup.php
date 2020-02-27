@@ -3,81 +3,81 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Signup extends CI_Controller {
 
+    private $errorMessage='';
 
  	function __construct(){
 		parent::__construct();
-		$this->load->model('Signupmodel','myModel');  
-		$this->load->model('Commonrepository','commonModel');
-		$this->load->library('RecurlyAuthentication'); 
+		$this->load->model('Signupmodel');
+		$this->load->library('recurlyauthenticationwrapper'); 
 	}
 
 	public function thirtyDayFreeTrialSignupClickFunnelWebhook(){
-			$requestJSONfromClickFunnel  = json_decode(file_get_contents("php://input"));
-            if(AWS_ENV_STATUS == 'LIVE' )
+			#$requestJSONfromClickFunnel  = json_decode(file_get_contents("php://input"));
+			$payloadjson=file_get_contents("http://localhost/CRC-CodeRefactoring/CRC---Refactoring");
+			$requestJSONfromClickFunnel=json_decode($payloadjson);
+			if(AWS_ENV_STATUS == 'LIVE' )
             $requestArrayFromClickfunnel = $this->setWebhookRequestParams($requestJSONfromClickFunnel->purchase,'cr_start');
             else
             $requestArrayFromClickfunnel = $this->setWebhookRequestParams($requestJSONfromClickFunnel,'cr_start_master');
-        	$validRecurlyAccountArray	 = $this->checkIsRecurlyValidAccount($requestArrayFromClickfunnel,$requestJSONfromClickFunnel);
+        	$validRecurlyAccountArray	 = $this->checkIsRecurlyValidAccount($requestArrayFromClickfunnel['subId'],$requestArrayFromClickfunnel['recurlyAccountCode'],$requestArrayFromClickfunnel['planCode']);
         	$recurlyAccountCode 		 = $validRecurlyAccountArray['recurlyAccountCode'];
-        	$subscriptionid 		 	 = $validRecurlyAccountArray['subscriptionid'];
-                       
+        	$subscriptionId 		 	 = $validRecurlyAccountArray['subscriptionId'];
+        	$clickFunnelSignupStatus 	 = $this->Signupmodel->selectData('half_regiestered_clickfunnel','signup_status',"email = '".$requestArrayFromClickfunnel['txtEmail']."'");
 
-	}
+        	
+    }
 
-
-
-
-
-	private function checkIsRecurlyValidAccount($requestArrayFromClickfunnel,$requestJSONfromClickFunnel){
-		$validRecurlyAccountArray							= array();
-		$isRecurlyValidAccount								= 0;
-		$validRecurlyAccountArray['subscriptionid']			= $requestArrayFromClickfunnel['subid'];
-		$validRecurlyAccountArray['recurlyAccountCode']		= $requestArrayFromClickfunnel['recurlyAc_code'];
+	private function checkIsRecurlyValidAccount($subscriptionId,$recurlyAccountCode,$planCode){
+		$validRecurlyAccountArray						= array();
+		$isRecurlyValidAccount							= 0;
+		$validRecurlyAccountArray['subscriptionId']		= $subscriptionId;
+		$validRecurlyAccountArray['recurlyAccountCode']	= $recurlyAccountCode;
 		try {
-		$subscriptions =$this->RecurlyAuthentication->getRecurlySubscriptionbyAccountCode($validRecurlyAccountArray['recurlyAccountCode']);
+		$subscriptions =$this->recurlyauthenticationwrapper->getRecurlySubscriptionsbyAccountCode($recurlyAccountCode);
 		foreach ($subscriptions as $subscription) {
-			if ($subscription->state == 'active' && $subscription->plan->plan_code == $plan_code) {
-			$isRecurlyValidAccount							= 1;
-			$validRecurlyAccountArray['subscriptionid'] 	= $subscription->uuid;
+			if ($subscription->state == 'active' && $subscription->plan->plan_code == $planCode) {
+			$isRecurlyValidAccount						= 1;
+			$validRecurlyAccountArray['subscriptionId'] = $subscription->uuid;
 			}
 		  }
 		} catch (Recurly_NotFoundError $e) {
-
+ 				$this->$errorMessage="CF - RECURLY ACCOUNT SUBSCRIPTION NOT FOUND THROUGH RECURLY ACCOUNT CODE";
 		}
 
-		if($isRecurlyValidAccount == 0 && !empty($validRecurlyAccountArray['subscriptionid'])){
+		if($isRecurlyValidAccount == 0 && !empty($subscriptionid)){
 		try {    
-		$subscription = $this->RecurlyAuthentication->getRecurlySubscriptionbySubscriptionid($validRecurlyAccountArray['subscriptionid']);
-		$validRecurlyAccountArray['recurlyAccountCode']		= explode("accounts/",array_values((array) $subscription->account)[1])[1];
+		$subscription = $this->recurlyauthenticationwrapper->getRecurlySubscriptionbySubscriptionId($subscriptionId);
+		echo '<pre>';print_r($subscription);exit;
+		$validRecurlyAccountArray['recurlyAccountCode']	= explode("accounts/",array_values((array) $subscription->account)[1])[1];
 		}catch (Recurly_NotFoundError $e) {
-		@mail("debuglog@creditrepaircloud.com", "CF - RECURLY ACCOUNT SUBSCRIPTION NOT FOUND", print_r($requestJSONfromClickFunnel,1));
-			exit;
+				$this->$errorMessage="CF - RECURLY ACCOUNT SUBSCRIPTION NOT FOUND THROUGH SUBSCRIPTION ID";
 			}
 		}
         return $validRecurlyAccountArray;
 	}
-
-
 	private function setWebhookRequestParams($requestJSONfromClickFunnel, $planCode){
-		 $requestArrayFromClickfunnel    = array(
-        'txtFirstName'    => trim(addslashes(ucfirst(strtolower($requestJSONfromClickFunnel->contact->first_name))));
-        'txtLastName'     => trim(addslashes(ucfirst(strtolower($requestJSONfromClickFunnel->contact->last_name))));
-        'txtCompanyName'  => trim(addslashes($requestJSONfromClickFunnel->contact->name));
-        'txtEmail'        => trim(strtolower($requestJSONfromClickFunnel->contact->email));
-        'txtPhone'        => trim($requestJSONfromClickFunnel->contact->phone);
-        'country'         => trim($requestJSONfromClickFunnel->contact->additional_info->custom_country);
-        'txtZip'          => trim($requestJSONfromClickFunnel->contact->zip);
-        'txtPass'         => trim($requestJSONfromClickFunnel->contact->additional_info->upwd);
-        'recurlyAc_code'  => trim($requestJSONfromClickFunnel->contact->contact_profile->cf_uvid);
-        'subid'           => trim($requestJSONfromClickFunnel->subscription_id);
-        'CF_error_message'=> trim($requestJSONfromClickFunnel->error_message);
-        'sales_person_id' => 0;
-        'ip_address'      => trim($requestJSONfromClickFunnel->contact->ip);
+		if(property_exists($requestJSONfromClickFunnel->contact->additional_info, 'growsumo_pid')) 
+		$GrowsumoPid 				 = trim($requestJSONfromClickFunnel->contact->additional_info->growsumo_pid);else
+		$GrowsumoPid 				 = '';
+		$requestArrayFromClickfunnel = array(
+        'txtFirstName'    	 		 => trim(addslashes(ucfirst(strtolower($requestJSONfromClickFunnel->contact->first_name)))),
+        'txtLastName'     	 		 => trim(addslashes(ucfirst(strtolower($requestJSONfromClickFunnel->contact->last_name)))),
+        'txtCompanyName'  	 		 => trim(addslashes($requestJSONfromClickFunnel->contact->name)),
+        'txtEmail'           		=> trim(strtolower($requestJSONfromClickFunnel->contact->email)),
+        'txtPhone'        	 		=> trim($requestJSONfromClickFunnel->contact->phone),
+        'country'         	 		=> trim($requestJSONfromClickFunnel->contact->additional_info->custom_country),
+        'txtZip'          	 		=> trim($requestJSONfromClickFunnel->contact->zip),
+        'txtPass'         	 		=> trim($requestJSONfromClickFunnel->contact->additional_info->upwd),
+        'recurlyAccountCode' 		=> trim($requestJSONfromClickFunnel->contact->contact_profile->cf_uvid),
+        'subId'           	 		=> trim($requestJSONfromClickFunnel->subscription_id),
+        'cfErrorMessage'	 		=> trim($requestJSONfromClickFunnel->error_message),
+        'salesPersonId'    	 		=> 0,
+        'ipAddress'        	 		=> trim($requestJSONfromClickFunnel->contact->ip),
         /*--assigning variable for the growsumo partner key--*/
-        'txtgs_id'        => trim($requestJSONfromClickFunnel->contact->additional_info->growsumo_pid);
-        'plan_code'       => $planCode;
+        'txtgsId'            		=> $GrowsumoPid,
+    	'planCode'        	 		=> $planCode,
         );
- 	return $requestArrayFromClickfunnel;
+    return $requestArrayFromClickfunnel;
 	}
 }
 ?>
