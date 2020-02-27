@@ -1,14 +1,56 @@
 <?php 
 class Signupmodel extends CI_Model{
 	
- 
-	/*
-	| -------------------------------------------------------------------
-	| Global function for select data
-	| -------------------------------------------------------------------
-	| Date: 25 Feb 2020
-	| 
-	|*/
+ 	public function  __construct(){
+		parent::__construct();
+		$this->load->dbforge();
+	}
+
+	public function updateStatusClickFunnel($table,$status, $email)
+	{
+		$this->db = $this->load->database('default', TRUE);
+		$data= Array('signup_status' => $status);
+		$where= Array('email' => $email);
+		$this->db->where($where);
+		if($this->db->update($table, $data)){
+			return 1;
+		}else{
+			return 0;
+		}
+	}
+
+	public function selectDataClickFunnel($table_name,$email){
+		$this->db = $this->load->database('default', TRUE);
+		$this->db->select('signup_status');
+		$this->db->from($table_name);
+		$this->db->where('email',$email);
+		$query = $this->db->get();
+		return $query->result_array();
+		//return $query->result_arr_ss();
+	}
+
+	public function updateLastCompleteStep($table,$status,$regId)
+	{
+		$this->db = $this->load->database('default', TRUE);
+		$data= Array('last_completed_step' => $status);
+		$where= Array('ireg_id' => $regId);
+		$this->db->where($where);
+		if($this->db->update($table, $data)){
+			return 1;
+		}else{
+			return 0;
+		}
+	}
+
+	public function insertData($table,$data)
+	{
+		$this->db = $this->load->database('default', TRUE);
+		if($this->db->insert($table,$data)){
+			return $this->db->insert_id();
+		}else{
+			return 0;
+		}
+	}
 	public function selectData($table_name,$fields='*',$where='1',$order_by='',$order_type='',$group_by='',$limit=''){
 		$this->db = $this->load->database('default', TRUE);
 		$this->db->select($fields);
@@ -84,6 +126,61 @@ class Signupmodel extends CI_Model{
 			echo $a2."<-------->".$a3."<br/>";
 		}	*/
 		return $query->result_obj_ss();
+	}
+
+	public function  getCountyNamebyId($cid){
+		$this->db = $this->load->database('default', TRUE);
+		$query = $this->db->get_where('cro_countries');
+		$this->db->select('icountry_id,vcountry_name');
+		$this->db->where('icountry_id',$cid);
+		$query = $this->db->get('cro_countries');
+		$country_nameArr=$query->result();
+		return $country_nameArr[0]->vcountry_name;
+	}
+
+	public function updateLeadStatus($lead_id,$status_id)
+        {
+           $URL='https://app.close.io/api/v1/lead/'.$lead_id.'/';
+           $lead_status = array("status_id"=>$status_id);
+           $lead_status = json_encode($lead_status);
+           $username = '815bbc2c61167dbcc083b8ea093ba891c757132dfc06fb23f4bbd235';
+           $password = '';
+           $ch = curl_init();
+           curl_setopt($ch, CURLOPT_URL,$URL);
+           curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+           curl_setopt($ch, CURLOPT_POSTFIELDS, $lead_status);
+           curl_setopt($ch, CURLOPT_TIMEOUT, 30); //timeout after 30 seconds
+           curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);
+           curl_setopt($ch, CURLOPT_HTTPHEADER, array(                                                                          
+                   'Accept: application/json',
+                   'Content-Type: application/json'));
+           curl_setopt($ch, CURLOPT_USERPWD, "$username:$password");
+           $status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);   //get status code
+           $result=curl_exec($ch);
+           curl_close ($ch);
+           return json_decode($result);
+        }
+    //Close.io integration start
+	public function closeioAddLead($lead)
+	{
+		$URL='https://app.close.io/api/v1/lead/';
+		$lead = json_encode($lead);
+		$username = '815bbc2c61167dbcc083b8ea093ba891c757132dfc06fb23f4bbd235';
+		$password = '';
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL,$URL);
+		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $lead);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 30); //timeout after 30 seconds
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+			'Accept: application/json',
+			'Content-Type: application/json'));
+		curl_setopt($ch, CURLOPT_USERPWD, "$username:$password");
+		$status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);   //get status code
+		$result=curl_exec ($ch);
+		curl_close ($ch);
+		return json_decode($result);
 	}
 	
 }
