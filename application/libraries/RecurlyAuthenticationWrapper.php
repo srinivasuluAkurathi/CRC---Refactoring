@@ -5,6 +5,8 @@ class RecurlyAuthenticationWrapper {
     {
     	$CI =& get_instance();
         $CI->load->library('recurlyclass');
+       // echo '<pre>';print_r(PAYMENT_GATEWAY_API_KEY);exit;
+        Recurly_Client::$apiKey = PAYMENT_GATEWAY_API_KEY;
     }
 
     public function getRecurlySubscriptionsbyAccountCode($recurlyAccountCode){

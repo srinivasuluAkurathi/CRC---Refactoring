@@ -10,117 +10,131 @@ class Signup extends CI_Controller {
 		$this->load->model('Signupmodel');
 		$this->load->library('recurlyauthenticationwrapper'); 
 		$this->load->library('growsumo');
+        //$this->load->library('cf/cfiles');
 	}
 
-	public function thirtyDayFreeTrialSignupClickFunnelWebhook(){
-			#$requestJSONfromClickFunnel  = json_decode(file_get_contents("php://input"));
-			$payloadjson=file_get_contents("http://localhost/CRC-CodeRefactoring/CRC---Refactoring");
-			$requestJSONfromClickFunnel=json_decode($payloadjson);
-			if(AWS_ENV_STATUS == 'LIVE' )
-            $requestArrayFromClickfunnel = $this->setWebhookRequestParams($requestJSONfromClickFunnel->purchase->contact,$requestJSONfromClickFunnel->purchase->subscription_id,$requestJSONfromClickFunnel->purchase->error_message,'cr_start');
-            else
-            $requestArrayFromClickfunnel = $this->setWebhookRequestParams($requestJSONfromClickFunnel->contact,$requestJSONfromClickFunnel->subscription_id,$requestJSONfromClickFunnel->error_message,'cr_start_master');
-        	echo '<pre>';print_r($requestArrayFromClickfunnel);exit;
-        	$validRecurlyAccountArray	 = $this->checkRecurlyAccountSubscription($requestArrayFromClickfunnel['subId'],$requestArrayFromClickfunnel['recurlyAccountCode'],$requestArrayFromClickfunnel['planCode']);
-        	$recurlyAccountCode 		 = $validRecurlyAccountArray['recurlyAccountCode'];
-        	$subscriptionId 		 	 = $validRecurlyAccountArray['subscriptionId'];
-        	$clickFunnelSignupStatus 	 = $this->Signupmodel->selectDataClickFunnel('half_regiestered_clickfunnel',$requestArrayFromClickfunnel['txtEmail']);
-        	if($clickFunnelSignupStatus[0]['signup_status'] == '0' && $subscriptionId!=''){
-        	 $dataSession =$this->submitSignupdataStep1($requestArrayFromClickfunnel,$recurlyAccountCode,$subscriptionId);
-        	 $this->submitSignupdataStep2($dataSession['registrationId']);
-        	 $clinentAffiliateIds=$this->submitSignupdataStep3($dataSession['registrationId'],$dataSession['fname'],$dataSession['lname'],$dataSession['adminEmail'],$dataSession['companyCountry']);
-        	  }
-        	 $this->submitSignupdataStep4($requestArrayFromClickfunnel['country'],$clinentAffiliateIds,$dataSession);
-        	 $this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'entry_data_signup_step4',$dataSession['registrationId']);
+	public function signupClickFunnelWebhook(){
+        #$requestJSONObject  = json_decode(file_get_contents("php://input"));
+        $payloadjson=file_get_contents("http://localhost/CRC-CodeRefactoring/CRC---Refactoring");
+        $requestJSONObject           = json_decode($payloadjson);
+        if(AWS_ENV_STATUS == 'LIVE' )
+        $requestArray = $this->setWebhookRequestParams($requestJSONObject->purchase->contact,$requestJSONObject->purchase->subscription_id,$requestJSONObject->purchase->error_message,'cr_start');    
+        else
+        $requestArray = $this->setWebhookRequestParams($requestJSONObject->contact,$requestJSONObject->subscription_id,$requestJSONObject->error_message,'cr_start_master');
 
-        	 $this->callingGrowsumoAPI($requestArrayFromClickfunnel['txtEmail'],$requestArrayFromClickfunnel['ipAddress'],$requestArrayFromClickfunnel['txtFirstName'],$requestArrayFromClickfunnel['txtLastName'],$requestArrayFromClickfunnel['txtgsId'],$recurlyAccountCode,$dataSession['registrationId']);
-        	 
-        	 $this->sendIntercomRequest($requestArrayFromClickfunnel['txtCompanyName'],$requestArrayFromClickfunnel['txtFirstName'],$requestArrayFromClickfunnel['txtLastName'],$requestArrayFromClickfunnel['txtPhone'],$dataSession['registrationId'],$dataSession['uid'],$dataSession['adminEmail']);
-
-        	 $this->sendDatatoProofAPI($dataSession['fname'],$dataSession['lname'],$dataSession['adminEmail'],$requestArrayFromClickfunnel['txtCompanyName'],$requestArrayFromClickfunnel['txtPhone'],$requestArrayFromClickfunnel['txtZip'],$requestArrayFromClickfunnel['ipAddress'],$requestArrayFromClickfunnel['country']);
-
-        	 $this->sendDatatoCloseioIntegration($dataSession['adminEmail'],$requestArrayFromClickfunnel['txtPhone'],$requestArrayFromClickfunnel['txtFirstName'],$requestArrayFromClickfunnel['txtCompanyName']);
-
-        	
-        	
+        $txtFirstName                = $requestArray['txtFirstName'];
+        $txtLastName                 = $requestArray['txtLastName'];
+        $txtEmail                    = $requestArray['txtEmail'];
+        $ipAddress                   = $requestArray['ipAddress'];
+        $txtgsId                     = $requestArray['txtgsId'];
+        $requestCountry              = $requestArray['country'];
+        $txtPhone                    = $requestArray['txtPhone'];
+        $txtZip                      = $requestArray['txtZip'];
+        $salesPersonId               = $requestArray['salesPersonId'];
+        $planCode                    = $requestArray['planCode'];
+        $subId                       = $requestArray['subId'];
+        $validRecurlyAccountArray	 = $this->checkRecurlyAccountSubscription($subId,$requestArray['recurlyAccountCode'],$planCode);
+        $recurlyAccountCode 		 = $validRecurlyAccountArray['recurlyAccountCode'];
+        $subscriptionId 		 	 = $validRecurlyAccountArray['subscriptionId'];
+        $clickFunnelSignupStatus 	 = $this->Signupmodel->selectDataClickFunnel($txtEmail);
+        if($clickFunnelSignupStatus[0]['signup_status'] == '0' && $subscriptionId!=''){
+        $dataSession =$this->submitSignupdataStep1($requestArray,$recurlyAccountCode,$subscriptionId);
+        $uid                         = $dataSession['uid'];
+        $registrationId              = $dataSession['registrationId'];
+        $fname                       = $dataSession['fname'];
+        $lname                       = $dataSession['lname'];
+        $adminEmail                  = $dataSession['adminEmail'];
+        $companyCountry              = $dataSession['companyCountry'];
+        //$this->submitSignupdataStep2($registrationId);
+        $clinentAffiliateIds=$this->submitSignupdataStep3($registrationId,$fname,$lname,$adminEmail,$companyCountry);
+        $this->submitSignupdataStep4($requestCountry,$clinentAffiliateIds,$dataSession);
+        $status=$this->Signupmodel->updateLastCompleteStep('entry_data_signup_step4',$registrationId);
+        echo '<pre>';print_r($status);exit;
+        $this->callingGrowsumoAPI($txtEmail,$ipAddress,$txtFirstName,$txtLastName,$txtgsId,$recurlyAccountCode,$registrationId);
+        $this->sendIntercomRequest($txtCompanyName,$txtFirstName,$txtLastName,$txtPhone,$registrationId,$uid,$adminEmail);
+        $this->sendDatatoProofAPI($fname,$lname,$adminEmail,$txtCompanyName,$txtPhone,$txtZip,$ipAddress,$requestCountry);
+        $this->sendDatatoCloseioIntegration($adminEmail,$txtPhone,$txtFirstName,$txtCompanyName);
+        $this->sendEmailtoSalesPerson($salesPersonId,$requestCountry,$txtPhone,$fname,$lname,$adminEmail);
+        $this->sendWelcomeEmailtoNewUser($uid,$adminEmail,$txtFirstName,$txtLastName);
+        $this->finalUpdateStatusClickFunnel($txtEmail,$recurlyAccountCode);
+        }else{
+            echo 'signup status is not 0';exit;
+        }
     }
 
-    
-
-
-
-    private function submitSignupdataStep1($requestArrayFromClickfunnel,$recurlyAccountCode,$subscriptionId){
-    	$this->Signupmodel->updateStatusClickFunnel('half_regiestered_clickfunnel','2',$requestArrayFromClickfunnel['email']);
+    private function submitSignupdataStep1($requestArray,$recurlyAccountCode,$subscriptionId){
+    	$this->Signupmodel->updateStatusClickFunnel('2',$requestArray['txtEmail']);
         $updateClickFunnelSignupStatus 			= '';
         #submit_signup_data_step1() START
         $planType = "monthly";
-        $timezone = $this->getTimeZoneFromIpAddress($ip_address);
+        $timezone = $this->getTimeZoneFromIpAddress($requestArray['ipAddress']);
         if($timezone == '' || $timezone == 'UTC') { $timezone = 'America/Los_Angeles'; }
         if($timezone != '') { date_default_timezone_set($timezone); }
-        $vtimezoneAbbr = $this->Signupmodel->selectDataGen(DB_DEFAULT,'cro_timezone','vtimezone_abbr',"vtimezone_name = '".$timezone."' ");
-        $insertCroCompanyRegstrationData = array(
+        $vtimezoneAbbr = $this->Signupmodel->getTimezone($timezone);
+        $CroCompanyRegstrationData = array(
 					"dreg_date"						=> date("Y-m-d H:i:s"),
-					"vcompany_name"					=> $requestArrayFromClickfunnel['txtCompanyName'],
-					"vfirst_name"					=> $requestArrayFromClickfunnel['txtFirstName'],
-					"vlast_name"					=> $requestArrayFromClickfunnel['txtLastName'],
-					"vemail"						=> $requestArrayFromClickfunnel['txtEmail'],
-					"vphone"						=> $requestArrayFromClickfunnel['txtPhone'],
-					"vcompany_country" 				=> $requestArrayFromClickfunnel['country'],
+					"vcompany_name"					=> $requestArray['txtCompanyName'],
+					"vfirst_name"					=> $requestArray['txtFirstName'],
+					"vlast_name"					=> $requestArray['txtLastName'],
+					"vemail"						=> $requestArray['txtEmail'],
+					"vphone"						=> $requestArray['txtPhone'],
+					"vcompany_country" 				=> $requestArray['country'],
 					"icompany_timezone" 			=> $timezone,
-					"vtimezone_abbr" 				=> $vtimezoneAbbr[0]->vtimezoneAbbr,
-					"vpostcode" 					=> trim($requestArrayFromClickfunnel['txtZip']),
+					"vtimezone_abbr" 				=> $vtimezoneAbbr[0]['vtimezone_abbr'],
+					"vpostcode" 					=> trim($requestArray['txtZip']),
 					"vaccount_status"				=> 'active',
 					"ipackage_id" 					=> 7,
-					"isales_person_id" 				=> $requestArrayFromClickfunnel['salesPersonId'],
+					"isales_person_id" 				=> $requestArray['salesPersonId'],
 					"vplan_type" 					=> $planType,
-					"vRecurly_email" 				=> $requestArrayFromClickfunnel['txtEmail'],
+					"vRecurly_email" 				=> $requestArray['txtEmail'],
 					"vRecurlyAc_code" 				=> $recurlyAccountCode,
 					"lead_notification_email" 		=> "1-",
 					"affiliate_notification_email" 	=> "1-",
 					"trial_period_end" 				=> date('Y-m-d', strtotime('+30 days')),
-					'vIP_address' 					=> $requestArrayFromClickfunnel['ipAddress'],
+					'vIP_address' 					=> $requestArray['ipAddress'],
 					'lastlogin' 					=> date("Y-m-d H:i:s"),
-					'growsumo_pk' 					=> $requestArrayFromClickfunnel['txtgsId']
+					'growsumo_pk' 					=> $requestArray['txtgsId']
                         );
-        $lastInsertId = $this->Signupmodel->insertData(CRO_COMPANY_RGSTRTN,$insertCroCompanyRegstrationData);
-        $countryDetailArr = $this->Signupmodel->selectDataGen(DB_DEFAULT, CRO_COUNTRIES ,'country_code, currency_code, currency_symbol', "icountry_id = ".$requestArrayFromClickfunnel['country']);
-                $CC = $countryDetailArr[0]->country_code;
-        $insertCroUserAccessData = array(
+        $lastInsertId      = $this->Signupmodel->setCompanyRegistrationData($CroCompanyRegstrationData);
+        $countryDetailArr  = $this->Signupmodel->getCroCountries($requestArray['country']);
+                $CC        = $countryDetailArr[0]['country_code'];
+        $CroUserAccessData = array(
     				"ireg_id" 						=> $lastInsertId,
-                    "vuser_name" 					=> addslashes($requestArrayFromClickfunnel['txtEmail']),
-                    "vpasswd" 						=> base64_encode(addslashes($requestArrayFromClickfunnel['txtPass'])),
+                    "vuser_name" 					=> addslashes($requestArray['txtEmail']),
+                    "vpasswd" 						=> base64_encode(addslashes($requestArray['txtPass'])),
                     "vuser_type" 					=> '1',
-                    "vFirst_Name" 					=> stripslashes($requestArrayFromClickfunnel['txtFirstName']),
-                    "vLast_Name" 					=> stripslashes($requestArrayFromClickfunnel['txtLastName']),
-                    "vemail" 						=> $requestArrayFromClickfunnel['txtEmail'],
+                    "vFirst_Name" 					=> stripslashes($requestArray['txtFirstName']),
+                    "vLast_Name" 					=> stripslashes($requestArray['txtLastName']),
+                    "vemail" 						=> $requestArray['txtEmail'],
                     "vCountryCode" 					=> $CC,
                     "db_name" 						=> $lastInsertId . "_crd"
                 );
-			$dataSession['uid'] = $this->Signupmodel->insertData(CRO_USER_ACCESS,$insertCroUserAccessData);
+            $dataSession['uid'] = $this->Signupmodel->setCroUserAccess($CroUserAccessData);
      		$dataSession['registrationId'] 		    = $lastInsertId;
-            $dataSession['fname'] 					= stripslashes($requestArrayFromClickfunnel['txtFirstName']);
-            $dataSession['lname'] 					= stripslashes($requestArrayFromClickfunnel['txtLastName']);
-            $dataSession['companyName'] 			= stripslashes($requestArrayFromClickfunnel['txtCompanyName']);
-            $dataSession['phone'] 					= $requestArrayFromClickfunnel['txtPhone'];
-            $dataSession['adminEmail'] 				= $requestArrayFromClickfunnel['txtEmail'];
-            $dataSession['companyCountry'] 			= $requestArrayFromClickfunnel['country'];
+            $dataSession['fname'] 					= stripslashes($requestArray['txtFirstName']);
+            $dataSession['lname'] 					= stripslashes($requestArray['txtLastName']);
+            $dataSession['companyName'] 			= stripslashes($requestArray['txtCompanyName']);
+            $dataSession['phone'] 					= $requestArray['txtPhone'];
+            $dataSession['adminEmail'] 				= $requestArray['txtEmail'];
+            $dataSession['companyCountry'] 			= $requestArray['country'];
             $dataSession['recurlyPaymentStatus'] 	= 'trial';
             $dataSession['planType'] 				= $planType;
-            $dataSession['userName'] 				= $requestArrayFromClickfunnel['txtEmail'];
+            $dataSession['userName'] 				= $requestArray['txtEmail'];
             $dataSession['userType'] 				= 'admin';
             $dataSession['dbName'] 					= $dataSession['registrationId'] . '_crd';
             $dataSession['countryCode'] 			= $CC;
-            $this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'submit_signup_data_step1',$dataSession['registrationId']);
-            $getCAS = $this->Signupmodel->selectData(CRO_AGENDA_SETTINGS,'*',"iuser_id = ".$dataSession['uid']);
+            $this->Signupmodel->updateLastCompleteStep('submit_signup_data_step1',$dataSession['registrationId']);
+            $getCAS = $this->Signupmodel->getAgendaSettings($dataSession['uid']);
             if(count($getCAS) <= 0){
              $dataCASTmp = array("iid" => '',"iuser_id" => $dataSession['uid'],"esend_email" => 'off');
-             $this->Signupmodel->insertData(CRO_AGENDA_SETTINGS,$dataCASTmp);
+             $this->Signupmodel->setAgendaSettings($dataCASTmp);
             }
             $this->createFolderAndMoveFilesInServer($dataSession['registrationId']);
             $updateRecurlyAccountCodeandSubsciptionId = Array('vRecurlyAc_code' => $recurlyAccountCode, 'vRecurlySubscriptionId' => $subscriptionId);
-            $this->Signupmodel->updateData(CRO_COMPANY_RGSTRTN,$updateRecurlyAccountCodeandSubsciptionId, "ireg_id = ".$dataSession['registrationId']);
+            $sta=$this->Signupmodel->updateCompanyData($updateRecurlyAccountCodeandSubsciptionId,$dataSession['registrationId']);
              #-=-=-=-=-=-=-=-=-=-=-=-=-Create Container, upload Bureau Logos & other IMG In Rackspace START-=-=-=-=-=-=-=-=-=-=-=-=-#
-            $this->createContainerAndMoveFiles($dataSession['registrationId'],$dataSession['companyCountry'],$subscriptionId);
+            //echo '<pre>';print_r($sta);exit;
+            //$this->createContainerAndMoveFiles($dataSession['registrationId'],$dataSession['companyCountry'],$subscriptionId);
 
             return $dataSession;
             
@@ -131,13 +145,13 @@ class Signup extends CI_Controller {
         $response = $this->cfiles->copy_obj('acrs.png','default_cmpny_misc',$registrationId.'_cmpny_misc');
         $response = $this->cfiles->copy_obj('ck.png','default_cmpny_misc',$registrationId.'_cmpny_misc');
         $response = $this->cfiles->copy_obj('crsk.png','default_cmpny_misc',$registrationId.'_cmpny_misc');
-        $this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'entry_data_signup_step2_first_3_cf',$registrationId);
+        $this->Signupmodel->updateLastCompleteStep('entry_data_signup_step2_first_3_cf',$registrationId);
         #entry_data_signup_step2_first_3_cf() END
         #entry_data_signup_step2_first_6_cf() START
         $response = $this->cfiles->copy_obj('k8.gif','default_cmpny_misc',$registrationId.'_cmpny_misc');
         $response = $this->cfiles->copy_obj('mcrs.png','default_cmpny_misc',$registrationId.'_cmpny_misc');
         $response = $this->cfiles->copy_obj('pg.png','default_cmpny_misc',$registrationId.'_cmpny_misc');
-        $this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'entry_data_signup_step2_first_6_cf',$registrationId);
+        $this->Signupmodel->updateLastCompleteStep('entry_data_signup_step2_first_6_cf',$registrationId);
         #entry_data_signup_step2_first_6_cf() END
         #entry_data_signup_step2_another_6_cf() START
         $response = $this->cfiles->copy_obj('cct.jpg','default_cmpny_misc',$registrationId.'_cmpny_misc');
@@ -145,7 +159,7 @@ class Signup extends CI_Controller {
         $response = $this->cfiles->copy_obj('sample_photo_id_copy.png', 'default_cmpny_documents', $registrationId. '_cmpny_documents');
         $response = $this->cfiles->copy_obj('sample_power_of_attorney.pdf', 'default_cmpny_documents', $registrationId . '_cmpny_documents');
         $response = $this->cfiles->copy_obj('sample_utility_bill_copy.png', 'default_cmpny_documents', $registrationId . '_cmpny_documents');
-        $this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'entry_data_signup_step2_another_6_cf',$registrationId);
+        $this->Signupmodel->updateLastCompleteStep('entry_data_signup_step2_another_6_cf',$registrationId);
         #entry_data_signup_step2_another_6_cf() END
         #-=-=-=-=-=-=-=-=-=-=-=-=-=Create Container, upload Bureau Logos & other IMG In Rackspace END-=-=-=-=-=-=-=-=-=-=-=-=-=#
      }
@@ -156,7 +170,7 @@ class Signup extends CI_Controller {
 			$insertControlData['ireg_id']   	= $registrationId;
 			$insertControlData['sender_name'] 	= ucfirst(strtolower($fname)) . " " . ucfirst(strtolower($lname));
 			$insertControlData['sender_email'] 	= $adminEmail;
-			$this->Signupmodel->insertData(CRO_CONTROLS,$insertControlData);
+			$this->Signupmodel->setCroControlData($insertControlData);
 			$clientPassword 		= str_shuffle('abcefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890');
 			$clientPassword 		= base64_encode(substr($clientPassword, 0, 8));
 			$dataSampleClient 		= array(
@@ -167,9 +181,10 @@ class Signup extends CI_Controller {
 					"vemail" 		=> "sample_" . $registrationId . "@client.com",
 					"db_name" 		=> $registrationId . "_crd"
 									);
-			$clientUserId 		= $this->Signupmodel->insertData(CRO_USER_ACCESS,$dataSampleClient);
+            echo '<pre>';print_r($dataSampleClient);
+            $clientUserId           = $this->Signupmodel->setSampleClient($dataSampleClient);
 			$affiiatePassword 		= str_shuffle('abcefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890');
-			$affiiatePassword 		= base64_encode(substr($AffiiatePassword, 0, 8));
+			$affiiatePassword 		= base64_encode(substr($affiiatePassword, 0, 8));
 			$dataSampleAffiliate    = array(
 					"vuser_name" 	=> "sample_affiliate_" . $registrationId,
 					"vpasswd" 		=> $affiiatePassword,
@@ -178,8 +193,9 @@ class Signup extends CI_Controller {
 					"vemail" 		=> "sample_" . $registrationId . "@affiliate.com",
 					"db_name" 		=> $registrationId . "_crd"
 							);
-			$affiliateUserId = $this->Signupmodel->insertData(CRO_USER_ACCESS,$dataSampleAffiliate);
-			$this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'entry_data_signup_step3',$registrationId);
+            echo '<pre>';print_r($dataSampleAffiliate);
+            $affiliateUserId = $this->Signupmodel->setSampleAffiliate($dataSampleAffiliate);
+			$this->Signupmodel->updateLastCompleteStep('entry_data_signup_step3',$registrationId);
 			#entry_data_signup_step3() END
 			if ($_SERVER["HTTP_HOST"] == "localhost") {
                     $con = mysql_connect("localhost", "root", "");
@@ -208,9 +224,10 @@ class Signup extends CI_Controller {
         $clinentAffiliateIds=array();
         $clinentAffiliateIds['clientUserId'] 	= $clientUserId;
         $clinentAffiliateIds['affiliateUserId']	= $affiliateUserId;
+        echo '<pre>';print_r($clinentAffiliateIds);
         return $clinentAffiliateIds;
     }
-    private function submitSignupdataStep4($requestArrayFromClickfunnelCountry,$clinentAffiliateIds,$dataSession){
+    private function submitSignupdataStep4($requestArrayCountry,$clinentAffiliateIds,$dataSession){
     	$adminUid 			= $dataSession['uid'];
     	$fname 				= $dataSession['fname'];
     	$lname 				= $dataSession['lname'];
@@ -218,8 +235,9 @@ class Signup extends CI_Controller {
     	$registrationId 	= $dataSession['registrationId'];
     	$clientUserId 		= $clinentAffiliateIds['clientUserId'];
     	$affiliateUserId 	= $clinentAffiliateIds['affiliateUserId'];
-		$countryDetailArr 	= $this->Signupmodel->selectDataGen(DB_DEFAULT, CRO_COUNTRIES ,'country_code, currency_code, currency_symbol', "icountry_id = ".$requestArrayFromClickfunnelCountry);
-                $CC = $countryDetailArr[0]->country_code;
+		$countryDetailArr   = $this->Signupmodel->getCroCountries($requestArrayCountry);
+        $CC                 = $countryDetailArr[0]['country_code'];
+        $currencySymbol    = $countryDetailArr[0]['currency_symbol'];
     	if($_SERVER["HTTP_HOST"] == "localhost") {
                     $con 		= mysql_connect("localhost", "root", "");
                 } else {
@@ -228,7 +246,7 @@ class Signup extends CI_Controller {
                 $db_selected 	= mysql_select_db('crcloud_'.$registrationId.'_crd', $con);
                 $current_date 	= date('Y-m-d H:i:s');
                 $current_Date_plus_2_hours = date("Y-m-d H:i:s", strtotime("+2 hour"));
-            mysql_query('INSERT INTO `crd_team` (`iTeam_id`, `iUser_id`, `iRole_id`, `vFirst_Name`, `vLast_Name`, `vEmail`, `vPhone`, `vMobile`, `vFax`, `vPhoto`, `vAddress`, `gender`,`created_date`) VALUES (1,'.$admin_uid.', 1, "' .$fname . '", "' . $lname . '", "' . $adminEmail . '", "", "", "", "", NULL, "Male", now())');
+            mysql_query('INSERT INTO `crd_team` (`iTeam_id`, `iUser_id`, `iRole_id`, `vFirst_Name`, `vLast_Name`, `vEmail`, `vPhone`, `vMobile`, `vFax`, `vPhoto`, `vAddress`, `gender`,`created_date`) VALUES (1,'.$adminUid.', 1, "' .$fname . '", "' . $lname . '", "' . $adminEmail . '", "", "", "", "", NULL, "Male", now())');
 
             mysql_query("INSERT INTO `crd_scheduler` (`Id`, `Subject`, `Location`, `Description`, `StartTime`, `EndTime`, `IsAllDayEvent`, `Color`, `RecurringRule`, `iclient_id`, `iTeam_id`, `reminder_type`) VALUES 
                         (1, 'Remember to complete your \'To-Do\' Items on your Home page!', NULL, NULL, '{$current_date}', '{$current_Date_plus_2_hours}', 0, NULL, NULL, NULL, NULL, NULL)");
@@ -244,25 +262,26 @@ class Signup extends CI_Controller {
             mysql_query("UPDATE `crd_affiliate` SET `iUser_id` = '" . $affiliateUserId . "',`ePortalAccess` = 'on' WHERE `iAffilate_id`= 1");
             mysql_query("UPDATE `crd_affiliate` SET `dreg_date` = CURRENT_DATE() WHERE `iAffilate_id` =1");
             if ($dataSession['companyCountry'] != 224) {
-                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_agreements SET `tagreement` = REPLACE(`tagreement`, '$', '" . $countryDetailArr[0]->currency_symbol . "')");
-                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_dispute_reasons SET `vdispute_reason` = REPLACE(`vdispute_reason`, '$', '" . $countryDetailArr[0]->currency_symbol . "')");
-                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_letter_templ SET `vtempt_text` = REPLACE(`vtempt_text`, '$', '" . $countryDetailArr[0]->currency_symbol . "')");
-                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_options SET `vOptionValue` = REPLACE(`vOptionValue`, '$', '" . $countryDetailArr[0]->currency_symbol . "')");
+                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_agreements SET `tagreement` = REPLACE(`tagreement`, '$', '" . $currencySymbol . "')");
+                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_dispute_reasons SET `vdispute_reason` = REPLACE(`vdispute_reason`, '$', '" . $currencySymbol . "')");
+                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_letter_templ SET `vtempt_text` = REPLACE(`vtempt_text`, '$', '" . $currencySymbol . "')");
+                mysql_query("UPDATE crcloud_" . $registrationId . "_crd.crd_options SET `vOptionValue` = REPLACE(`vOptionValue`, '$', '" . $currencySymbol. "')");
             }
             mysql_close($con);
+
     }
 
     private function createContainerAndMoveFiles($registrationId,$companyCountry,$subscriptionId){
     	$dataSession['RecurlySubscriptionId'] 	= $subscriptionId;
         $dataSession['acc_status'] 				= 'active';
         $containerArr = array();
-        $this->cfiles->cf_container 			= $data_session['reg_id'].'_cmpny_attachment';
+        $this->cfiles->cf_container 			= $registrationId.'_cmpny_attachment';
         $container_url = $this->cfiles->do_container('a');
         $containerArr['attachment'] 			= $container_url;
-        $this->cfiles->cf_container 			= $data_session['reg_id'].'_cmpny_documents';
+        $this->cfiles->cf_container 			= $registrationId.'_cmpny_documents';
         $container_url = $this->cfiles->do_container('a');
         $containerArr['documents'] 				= $container_url;
-        $this->cfiles->cf_container 			= $data_session['reg_id'].'_cmpny_misc';
+        $this->cfiles->cf_container 			= $registrationId.'_cmpny_misc';
         $container_url 							= $this->cfiles->do_container('a');
         $containerArr['misc'] 					= $container_url;
         
@@ -277,12 +296,11 @@ class Signup extends CI_Controller {
         $response 	  = $this->cfiles->copy_obj('cas.gif','default_cmpny_misc',$registrationId.'_cmpny_misc');
         $response 	  = $this->cfiles->copy_obj('ccp.png','default_cmpny_misc',$registrationId.'_cmpny_misc');
         $data_state_management = Array('last_completed_step' => 'entry_data_signup_step1_recurly');
-        $this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'entry_data_signup_step1_recurly',$registrationId);
+        $this->Signupmodel->updateLastCompleteStep('entry_data_signup_step1_recurly',$registrationId);
 
     }
     private function createFolderAndMoveFilesInServer($registrationId){
-
-    	$errorFlag = 0;
+        $errorFlag = 0;
         if(!mkdir($_SERVER['DOCUMENT_ROOT'].str_replace("index.php",'',$_SERVER['SCRIPT_NAME'])."uploads/".$registrationId.'_cmpny', 0777, true)){ $errorFlag = 1; }
         if(!mkdir($_SERVER['DOCUMENT_ROOT'].str_replace("index.php",'',$_SERVER['SCRIPT_NAME'])."uploads/".$registrationId.'_cmpny/logos', 0777, true) || $errorFlag != 0){ $errorFlag = 1; }
         if(!mkdir($_SERVER['DOCUMENT_ROOT'].str_replace("index.php",'',$_SERVER['SCRIPT_NAME'])."uploads/".$registrationId.'_cmpny/contacts', 0777, true) || $errorFlag != 0){ $errorFlag = 1; }
@@ -299,8 +317,9 @@ class Signup extends CI_Controller {
             fwrite($fh, $stringData);
             fclose($fh);
         }
-        $this->Signupmodel->updateLastCompleteStep(CRO_COMPANY_RGSTRTN,'entry_data_signup_step1_useraccess',$registrationId);
+       $sta= $this->Signupmodel->updateLastCompleteStep('entry_data_signup_step1_useraccess',$registrationId);
     }
+
 	private function checkRecurlyAccountSubscription($subscriptionId,$recurlyAccountCode,$planCode){
 		$validRecurlyAccountArray						= array();
 		$isRecurlyValidAccount							= 0;
@@ -328,29 +347,30 @@ class Signup extends CI_Controller {
 		}
         return $validRecurlyAccountArray;
 	}
-	private function setWebhookRequestParams($requestJSONfromClickFunnel,$subscriptionId,$errorMessage,$planCode){
-		if(property_exists($requestJSONfromClickFunnel->additional_info, 'growsumo_pid')) 
-		$GrowsumoPid 				 = trim($requestJSONfromClickFunnel->additional_info->growsumo_pid);else
+
+	private function setWebhookRequestParams($requestJSONObject,$subscriptionId,$errorMessage,$planCode){
+		if(property_exists($requestJSONObject->additional_info, 'growsumo_pid')) 
+		$GrowsumoPid 				 = trim($requestJSONObject->additional_info->growsumo_pid);else
 		$GrowsumoPid 				 = '';
-		$requestArrayFromClickfunnel = array(
-        'txtFirstName'    	 		 => trim(addslashes(ucfirst(strtolower($requestJSONfromClickFunnel->first_name)))),
-        'txtLastName'     	 		 => trim(addslashes(ucfirst(strtolower($requestJSONfromClickFunnel->last_name)))),
-        'txtCompanyName'  	 		 => trim(addslashes($requestJSONfromClickFunnel->name)),
-        'txtEmail'           		 => trim(strtolower($requestJSONfromClickFunnel->email)),
-        'txtPhone'        	 		 => trim($requestJSONfromClickFunnel->phone),
-        'country'         	 		 => trim($requestJSONfromClickFunnel->additional_info->custom_country),
-        'txtZip'          	 		 => trim($requestJSONfromClickFunnel->zip),
-        'txtPass'         	 		 => trim($requestJSONfromClickFunnel->additional_info->upwd),
-        'recurlyAccountCode' 		 => trim($requestJSONfromClickFunnel->contact_profile->cf_uvid),
+		$requestArray = array(
+        'txtFirstName'    	 		 => trim(addslashes(ucfirst(strtolower($requestJSONObject->first_name)))),
+        'txtLastName'     	 		 => trim(addslashes(ucfirst(strtolower($requestJSONObject->last_name)))),
+        'txtCompanyName'  	 		 => trim(addslashes($requestJSONObject->name)),
+        'txtEmail'           		 => trim(strtolower($requestJSONObject->email)),
+        'txtPhone'        	 		 => trim($requestJSONObject->phone),
+        'country'         	 		 => trim($requestJSONObject->additional_info->custom_country),
+        'txtZip'          	 		 => trim($requestJSONObject->zip),
+        'txtPass'         	 		 => trim($requestJSONObject->additional_info->upwd),
+        'recurlyAccountCode' 		 => trim($requestJSONObject->contact_profile->cf_uvid),
         'subId'           	 		 => trim($subscriptionId),
         'cfErrorMessage'	 		 => trim($errorMessage),
         'salesPersonId'    	 		 => 0,
-        'ipAddress'        	 		 => trim($requestJSONfromClickFunnel->ip),
+        'ipAddress'        	 		 => trim($requestJSONObject->ip),
         /*--assigning variable for the growsumo partner key--*/
         'txtgsId'            		 => $GrowsumoPid,
     	'planCode'        	 		 => $planCode,
         );
-    return $requestArrayFromClickfunnel;
+    return $requestArray;
 	}
 
 	private function callingGrowsumoAPI($txtEmail,$ipAddress,$txtFirstName,$txtLastName,$txtgsId,$recurlyAccountCode,$registrationId){
@@ -368,7 +388,7 @@ class Signup extends CI_Controller {
                     
                     $update_grsm_cust_result = $this->growsumo->update_growsumo_customer($update_grsm_cust_arr);
                     $data_grsm_management = Array('growsumo_pk' => trim($grsm_cust_detail_call->rdata->partner_key));
-                    $this->Signupmodel->updateData(CRO_COMPANY_RGSTRTN,$data_grsm_management, "ireg_id = ".$registrationId);
+                    $this->Signupmodel->updateGrowsumoInCompany($data_grsm_management,$registrationId);
                     }else{
                     if($txtgsId != '' && !empty($txtgsId)){
                         $grsm_cust_data['cust_key'] 	= $recurlyAccountCode;
@@ -512,6 +532,134 @@ class Signup extends CI_Controller {
 	          }
 	      }
 	      #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=Code for close.io integration END=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-#
+    }
+
+    private function finalUpdateStatusClickFunnel($txtEmail,$recurlyAccountCode){
+        $check_reg_id_entry = $this->Signupmodel->selectDataGen(DB_DEFAULT, CRO_COMPANY_RGSTRTN ,'ireg_id', "vemail = '".$txtEmail."'");
+            if (isset($check_reg_id_entry[0]->ireg_id) && $check_reg_id_entry[0]->ireg_id > 0) {
+                $update_CF_signup_status = Array('signup_status' => '1','recurly_account_code' => $recurlyAccountCode);
+                $this->Signupmodel->updateClickFunnelStatus($update_CF_signup_status,$txtEmail);
+                
+            } else {
+                @mail("debuglog@creditrepaircloud.com", "CF - ACCOUNT NOT CREATED", print_r($post_data,1));
+                @mail("debuglog@creditrepaircloud.com", "CF - B. recurlyAc_code", 'recurlyAc_code - '.$recurlyAc_code);
+               $this->Signupmodel->updateStatusClickFunnel('0', $txtEmail);
+            }
+    }
+     private function sendEmailtoSalesPerson($salesPersonId,$country,$txtPhone,$fname,$lname,$adminEmail){
+         #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=Code for send email to sales person START-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+        
+        $country_name       = $this->Signupmodel->getCountyNamebyId($country);
+        $adminArray         = array(
+                'name'      => $fname . ' ' . $lname,
+                'email'     => $adminEmail,
+                'phone'     => $txtPhone,
+                'country'   => $country
+            );
+        if ($salesPersonId > 0) {
+            $salesPersonDetails         = $this->Signupmodel->getSalesPerson($salesPersonId);
+            if ($salesPersonDetails[0]->vsales_person_email != "") {
+                $emailTplSalesPerson    = $this->Signupmodel->emailTemplateForSalesPerson(ucfirst($salesPersonDetails[0]->vsales_person_name), $adminArray);
+                $to         = $salesPersonDetails[0]->vsales_person_email;
+                $subject    = "Your customer " . ucwords($adminArray['name']) . " signed up for Credit Repair Cloud Free Trial! (survey)";
+                $from       = "support@creditrepaircloud.com";
+                $fromName   = "Credit Repair Cloud";
+                $email_Sent = $this->sendSalesPersonEmail($to, $subject, $emailTplSalesPerson, $from, $fromName);
+            }
+        }
+        #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-Code for send email to sales person END-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-#
+        #-=-=-=-=-=-=-=-=-=-=-=-=-=-Code for send terms & conditions agreement mail to Daniel START-=-=-=-=-=-=-=-=-=-=-=-=-=-#
+        $to_daniel         = "sales@credit-aid.com";
+        $subject_terms     = "Agreement of terms, refund policy, charge authorization for Credit Repair Cloud " . $adminArray['name'];
+        $from_terms        = "support@creditrepaircloud.com";
+        $emailTplTerms     = $this->Signupmodel->TemplateForTermsConditions($adminArray);
+        $email_Sent_terms  = $this->sendEmail($to_daniel, $subject_terms, $emailTplTerms, $from_terms, $adminArray['name']);
+        #-=-=-=-=-=-=-=-=-=-=-=-=-=-=Code for send terms & conditions agreement mail to Daniel END-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+    }
+
+    # send sales person email function
+    function sendSalesPersonEmail($to, $subject, $emailTpl, $from, $from_name){
+        $this->load->library('email');
+        $config = unserialize (EMAIL_CONFIG);
+        $this->email->initialize($config);
+        $this->email->from($from, $from_name);
+        $this->email->to($to); 
+        $this->email->add_custom_header('X-MC-Subaccount','crcloud');
+        $this->email->subject($subject);
+        $this->email->message($emailTpl); 
+        $email_Sent = $this->email->send();
+        return $email_Sent;
+    }
+
+    private function sendWelcomeEmailtoNewUser($uid,$adminEmail,$txtFirstName,$txtLastName){
+     #=-=-=-=-=-=-=-=-=-=-=-= START-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+                $userDetails = $this->Signupmodel->getUserNameAndPassword($uid);
+                $to_signup = trim($adminEmail);
+                $userDetails->vpasswd = base64_decode($user_details->vpasswd);
+                $subject_signup = "Welcome to Credit Repair Cloud";
+                $fromSignup = "support@creditrepaircloud.com";
+                $fromNameSignup = "Credit Repair Cloud";
+                $NAME = ucwords(trim($txtFirstName) . ' ' . trim($txtLastName));
+                $image_url = "https://www.creditrepaircloud.com/application/images/mailer/";
+                $date = date("Y-m-d");
+                $search = array('{mailer_path}',
+                    '{admin_first_name}',
+                    '{admin_last_name}',
+                    '{user_id}',
+                    '{password}',
+                    '{subscription_end_date}',
+                    'SECURECLIENTACCESS_URL',
+                    'TEAM_LOGIN_URL'
+                );
+                $replace = array($image_url,
+                    ucfirst(trim(stripslashes($txtFirstName))),
+                    ucfirst(trim(stripslashes($txtLastName))),
+                    trim(stripslashes($userDetails->vuser_name)),
+                    stripslashes($userDetails->vpasswd),
+                    date('m/d/Y', strtotime('+29 days')),
+                    SECURECLIENTACCESS_URL,
+                    TEAM_LOGIN_URL
+                );
+                $headers  = 'MIME-Version: 1.0' . "\r\n";
+                $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
+                $headers .= 'From: ' . $fromNameSignup . ' <' . $fromSignup . '>' . "\r\n";
+                $headers .= 'Reply-To: support@creditrepaircloud.com' . "\r\n";
+                $headers .= 'Bcc: sales@credit-aid.com' . "\r\n";
+                $email = ucfirst(trim(ucfirst(strtolower($txtFirstName)))) . ' ' . ucfirst(trim(ucfirst(strtolower($txtLastName)))) . '<' . $to_signup . '>';
+                $template = $this->Signupmodel->emailTemplateForNewSignup();
+                $emailTpl = stripslashes($template->body);
+                $emailTpl = '<body style="margin:0px; padding:0px; background-color: #F2F2F2" bgcolor="#F2F2F2">' . str_replace($search, $replace, $emailTpl) . '</body>';
+                if($txtFirstName!="") {
+                    @mail($email, $template->subject, $emailTpl, $headers);
+                }
+                #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-Code for send welcome email to new user END-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-#
+    }
+    # send email function
+    private function sendEmail($to, $subject, $emailTpl, $from, $from_name, $cc_email='',$reply_to='', $reply_to_name='', $bcc_email=''){
+        #echo $to; exit;
+        $this->load->library('email');
+        $config = unserialize (EMAIL_CONFIG);
+        $this->email->initialize($config);
+        if($from == 'no-reply@secureclientaccess.com')
+           $from = $from_name.'<'.$from.'>';
+        $this->email->from($from, $from_name);
+        $this->email->to($to); 
+        if($cc_email != ''){
+            $this->email->cc($cc_email);
+        }
+        if($bcc_email != ''){
+            $this->email->bcc($bcc_email);
+        }
+        if ($reply_to != '') {
+            $this->email->reply_to($reply_to, $reply_to_name);
+        }
+        $this->email->add_custom_header('X-MC-Subaccount','crcloud');
+        $this->email->add_custom_header('X-MC-SigningDomain','creditrepaircloud.com');
+        $this->email->subject($subject);
+        $this->email->message($emailTpl); 
+        $email_Sent = $this->email->send();
+        #echo $CI->email->print_debugger()."<br><hr><br>"; exit;
+        return $email_Sent;
     }
 
 	private function send_curl_request($method,$url,$post="")
