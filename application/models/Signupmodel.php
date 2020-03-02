@@ -66,6 +66,14 @@ class Signupmodel extends CI_Model{
 		$reslut = $this->selectData(CRO_AGENDA_SETTINGS,'*',"iuser_id = ".$uid);
 		return $reslut;
 	}
+	public function getCroLeadHistory($adminEmail){
+		$reslut = $this->selectDataGen(DB_DEFAULT, 'cro_lead_history','lead_id', "email = '".trim($adminEmail)."'");
+		return $reslut;
+	}
+	public function setLeadHistory($ins_data){
+		$reslut = $this->insertGenData(DB_DEFAULT, CRO_LEAD_HISTORY, $ins_data);
+		return $reslut;
+	}
 	public function setAgendaSettings($dataCASTmp){
 		$result=$this->insertData(CRO_AGENDA_SETTINGS,$dataCASTmp);
 		return $result;
